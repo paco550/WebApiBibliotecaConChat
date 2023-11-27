@@ -82,6 +82,7 @@ namespace WebApiBiblioteca.Hubs
 
             // Enviar la lista actualizada de usuarios a todos los clientes
             await Clients.All.GetUsers(conexiones);
+            }
 
             // Llamar al método base para manejar la desconexión
             await base.OnDisconnectedAsync(exception);
