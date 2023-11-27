@@ -1,15 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using WebApiBiblioteca.DTOs;
 using WebApiBiblioteca.Filters;
 using WebApiBiblioteca.Models;
 using WebApiBiblioteca.Services;
+using WebApiMicroservicios.DTOs;
 
 namespace WebApiBiblioteca.Controllers
 {
@@ -308,6 +311,70 @@ namespace WebApiBiblioteca.Controllers
             await _context.SaveChangesAsync();
 
             return Ok();
+        }
+
+        [AllowAnonymous]
+        [HttpPost("servicioimagenes")]
+        public async Task<ActionResult> PostProductosMicroservicio([FromForm] DTOAgregarLibro libro)
+        {
+            Libro newLibro = new Libro
+            {
+                Isbn = libro.ISBN,
+                Titulo= libro.Titulo,
+                Paginas= libro.Paginas,
+                Descatalogado= libro.Descatalogado,
+                IdAutor= libro.AutorId,
+                IdEditorial= libro.EditorialId,
+                Precio= libro.Precio,
+
+               
+            };
+
+            // Necesitamos comunicarnos con el microservicio. Eso pasa por "atacar" la post del controller Archivos del microservicio
+            // Para hacer esto, tenemos que emitir una petición http. En asp, tenemos que crear un objeto de clase HttpClient
+            var client = new HttpClient();
+            if (libro.FotoPortada != null)
+            {
+                using (var memoryStream = new MemoryStream())
+                {
+                    // Extraemos la imagen de la petición
+                    await libro.FotoPortada.CopyToAsync(memoryStream);
+                    // La convertimos a un array de bytes que es lo que necesita el método de guardar
+                    var contenido = memoryStream.ToArray();
+                    DTOArchivo archivo = new DTOArchivo
+                    {
+                        Nombre = libro.FotoPortada.FileName,
+                        Contenido = contenido,
+                        Carpeta = "imagenes",
+                        ContentType = libro.FotoPortada.ContentType
+                    };
+                    // Comienza la petición
+                    // Es una post que, como toda petición post, va a incluir un body
+                    // El body es el DTOArchivo que hemos llamado archivo
+                    // Debemos convertir el objeto archivo a json (siguiente línea)
+                    var body = JsonConvert.SerializeObject(archivo);
+                    // Pasar ese json a un string (siguiente línea)
+                    var stringContent = new StringContent(
+                        body,
+                        UnicodeEncoding.UTF8,
+                        "application/json"
+                        );
+                    // Emitimos la petición. response es la respuesta con el nombre del archivo
+                    var response = await client.PostAsync(
+                        "https://localhost:7259/api/Archivos",
+                        stringContent
+                        );
+                    // Esa respuesta debemos leerla y convertirla en este caso a un string
+                    var nombreArchivo = await response.Content.ReadAsStringAsync();
+                    // El nombre del archivo lo pasamos al producto
+                    newLibro.FotoPortada = nombreArchivo;
+                }
+            }
+
+            await _context.AddAsync(newLibro);
+            await _context.SaveChangesAsync();
+
+            return Ok(newLibro);
         }
 
         [HttpPut("{isbn}")]

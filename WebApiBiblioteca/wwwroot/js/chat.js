@@ -2,31 +2,47 @@
 // Creación de la conexión al hub SignalR
 const conexion = new signalR.HubConnectionBuilder().withUrl("/chatHub").build();
 
+// Añadir opciones al elemento select
+const ddlSalas = document.getElementById("ddlSalas");
+const salasDisponibles = ["Literatura", "Ciencia", "Arte"];
+
+salasDisponibles.forEach((sala) => {
+    const opcion = document.createElement("option");
+    opcion.value = sala;
+    opcion.text = sala;
+    ddlSalas.appendChild(opcion);
+});
+
 // Código que muestra el mensaje en la interfaz de usuario
 conexion.on("GetMessage", (message) => {
-    // Crear elementos HTML para mostrar el mensaje
-    const li = document.createElement("li");
-    const avatar = document.createElement("img");
-    const mensaje = document.createElement("span");
+    const salaSeleccionada = document.getElementById("ddlSalas").value;
 
-    // Configurar la imagen de avatar
-    avatar.src = message.avatar;
-    avatar.alt = "Avatar de " + message.user;
-    avatar.width = 50;
-    avatar.height = 50;
-    avatar.classList.add("img-fluid");
-    avatar.style.marginRight = "10px";
-    avatar.style.borderRadius = "50%";
+    // Verificar si el mensaje pertenece a la sala seleccionada
+    //if (message.sala === salaSeleccionada) {
+        // Crear elementos HTML para mostrar el mensaje
+        const li = document.createElement("li");
+        const avatar = document.createElement("img");
+        const mensaje = document.createElement("span");
 
-    // Configurar el contenido del mensaje con el nombre de usuario y el texto
-    mensaje.textContent = message.user + " - " + message.text;
+        // Configurar la imagen de avatar
+        avatar.src = message.avatar;
+        avatar.alt = "Avatar de " + message.user;
+        avatar.width = 50;
+        avatar.height = 50;
+        avatar.classList.add("img-fluid");
+        avatar.style.marginRight = "10px";
+        avatar.style.borderRadius = "50%";
 
-    // Agregar la imagen de avatar y el mensaje al elemento de lista
-    li.appendChild(avatar);
-    li.appendChild(mensaje);
+        // Configurar el contenido del mensaje con el nombre de usuario y el texto
+        mensaje.textContent = message.user + " - " + message.text;
 
-    // Agregar el elemento de lista a la lista de mensajes en la interfaz de usuario
-    document.getElementById("lstMensajes").appendChild(li);
+        // Agregar la imagen de avatar y el mensaje al elemento de lista
+        li.appendChild(avatar);
+        li.appendChild(mensaje);
+
+        // Agregar el elemento de lista a la lista de mensajes en la interfaz de usuario
+        document.getElementById("lstMensajes").appendChild(li);
+   // }
 });
 
 // Código para mostrar la lista de usuarios conectados en la interfaz de usuario
@@ -76,6 +92,7 @@ conexion.on("GetUsers", (users) => {
 //}).catch((error) => {
 //    console.error(error);
 //});
+// Evento de conexión
 
 //manejo de eventos del cliente Se agregan varios event listeners para manejar eventos 
 //del usuario, como la introducción de texto de usuario, mensajes, 
@@ -90,6 +107,10 @@ document.getElementById("txtMensaje").addEventListener("input", (event) => {
 
 // Código para conectar y desconectar el cliente
 document.getElementById("btnConectar").addEventListener("click", (event) => {
+    const salaSeleccionada = document.getElementById("ddlSalas").value;
+    const usuario = document.getElementById("txtUsuario").value;
+    const avatar = document.getElementById("txtAvatar").value;
+
     // Verificar si la conexión está desconectada
     if (conexion.state === signalR.HubConnectionState.Disconnected) {
         // Iniciar la conexión con el servidor SignalR
@@ -98,7 +119,7 @@ document.getElementById("btnConectar").addEventListener("click", (event) => {
             const li = document.createElement("li");
             li.textContent = "Conectado con el servidor en tiempo real";
             document.getElementById("lstMensajes").appendChild(li);
-
+            const salaSeleccionada = document.getElementById("ddlSalas").value;
             // Actualizar la interfaz de usuario y deshabilitar campos
             document.getElementById("btnConectar").textContent = "Desconectar";
             document.getElementById("txtUsuario").disabled = true;
@@ -107,21 +128,17 @@ document.getElementById("btnConectar").addEventListener("click", (event) => {
             document.getElementById("btnEnviar").disabled = false;
 
             // Obtener información de usuario y construir un mensaje vacío
-            const usuario = document.getElementById("txtUsuario").value;
-            const avatar = document.getElementById("txtAvatar").value;
             const message = {
                 user: usuario,
                 avatar: avatar,
-                text: ""
+                text: "",
+                sala: salaSeleccionada  // Agrega la sala seleccionada al mensaje
             }
 
             // Enviar un mensaje al servidor indicando que el usuario se ha conectado
-            conexion.invoke("SendMessage", message).catch(function (error) {
+            conexion.invoke("SendMessage", message).catch((error) => {
                 console.error(error);
             });
-
-        }).catch(function (error) {
-            console.error(error);
         });
     }
     // Verificar si la conexión está conectada
@@ -147,6 +164,24 @@ document.getElementById("btnConectar").addEventListener("click", (event) => {
     }
 });
 
+// Agregar un evento para permitir que los usuarios se unan a una sala
+document.getElementById("btnUnirseSala").addEventListener("click", (event) => {
+    const salaSeleccionada = document.getElementById("ddlSalas").value;
+    const usuario = document.getElementById("txtUsuario").value;
+    const avatar = document.getElementById("txtAvatar").value;
+
+    const message = {
+        user: usuario,
+        avatar: avatar,
+        text: "",
+        sala: salaSeleccionada
+    }
+
+    conexion.invoke("UnirseASala", salaSeleccionada, message).catch(function (error) {
+        console.error(error);
+    });
+});
+
 //Código para enviar un mensaje al hub Cuando el usuario hace clic en el botón 
 //"Enviar", se recopila la información del usuario y el mensaje, y se invoca 
 //el método del hub llamado "SendMessage" para enviar el mensaje al servidor.
@@ -154,10 +189,12 @@ document.getElementById("btnEnviar").addEventListener("click", (event) => {
     const usuario = document.getElementById("txtUsuario").value;
     const texto = document.getElementById("txtMensaje").value;
     const avatar = document.getElementById("txtAvatar").value;
+    const salaSeleccionada = document.getElementById("ddlSalas").value;
     const data = {
         user: usuario,
         text: texto,
-        avatar: avatar
+        avatar: avatar,
+        sala: salaSeleccionada,      
     }
 
     // invoke nos va a comunicar con el hub y el evento para pasarle el mensaje
